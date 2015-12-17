@@ -7,8 +7,12 @@
 //
 
 import Foundation
+#if os(Linux)
+    import Glibc
+#else
+    import Darwin.C
+#endif
 
-/// Simple wrapper for C sockaddr
 class IRSockaddr{
     
     var cSockaddr:sockaddr_in
@@ -23,4 +27,11 @@ class IRSockaddr{
         )
     }
     
+    init(socket: sockaddr_in){
+        cSockaddr = socket
+    }
+    
+    func toString() -> String{
+        return "127.0.0.1 \(ntohs(cSockaddr.sin_port))"
+    }
 }

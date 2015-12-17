@@ -7,6 +7,11 @@
 //
 
 import Foundation
+#if os(Linux)
+    import Glibc
+#else
+    import Darwin.C
+#endif
 
 enum IRSocketError: ErrorType{
     case BindFailed(error: Int32)
@@ -70,9 +75,57 @@ class IRSocket{
 
     }
     
+    
+    /// Recives data from socket and returns it unmodified
+    /// If no data is available call waits for message to arive
+    ///
+    /// - Parameter maxLen: maximum data length in bytes
+    /// - Parameter flag: check http://linux.die.net/man/2/recvfrom
+    /// - Return: recived byte array
+    func recive(maxLen: Int = 500, flag: Int32 = 0) -> Array<UInt8>{
+        let buffer = Array<UInt8>(count: maxLen, repeatedValue: 0)
+        
+        let count = recv(cSocket, UnsafeMutablePointer<Void>(buffer), maxLen, flag)
+        
+        return Array(buffer[0..<count])
+    }
+    
+    
+    /// Recives data from socket and returns it unmodified toghether with sender address
+    /// If no data is available call waits for message to arive
+    ///
+    /// - Parameter maxLen: maximum data length in bytes
+    /// - Parameter flag: check http://linux.die.net/man/2/recvfrom
+    /// - Return: recived byte array and sender address
+    func reciveAndStoreAddres(maxLen: Int = 500, flag: Int32 = 0) -> (Array<UInt8>, IRSockaddr){
+        let buffer:Array<UInt8> = Array(count: maxLen, repeatedValue: 0)
+        
+        var sockLen = socklen_t(16)
+        var addr = sockaddr_in()
+
+        let count = withUnsafeMutablePointer(&addr) {
+            recvfrom(cSocket , UnsafeMutablePointer<Void>(buffer), maxLen, flag, UnsafeMutablePointer($0), &sockLen)
+        }
+        
+        return (Array(buffer[0..<count]), IRSockaddr(socket: addr))
+    }
+    
+    
+    func sendTo(addr:IRSockaddr, string:String){
+        
+        string.withCString { cstr -> Void in
+            withUnsafePointer(&addr.cSockaddr) { ptr -> Void in
+                let addrptr = UnsafePointer<sockaddr>(ptr)
+                
+                sendto(cSocket, cstr, string.lengthOfBytesUsingEncoding(NSUTF8StringEncoding), 0, addrptr, socklen_t(addr.cSockaddr.sin_len))
+            }
+        }
+        
+    }
+ 
+    
     /// Closes socket
     deinit{
         close(cSocket)
     }
-    
 }
